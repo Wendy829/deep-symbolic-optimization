@@ -28,6 +28,24 @@ This repository contains code supporting the following publications:
 10. Glatt et al. 2022 **Deep Symbolic Optimization for Electric Component Sizing in Fixed Topology Power Converters** *AI for Design and Manufacturing (ADAM) @ AAAI 2022.* [Paper](https://openreview.net/forum?id=u_ghY9PnAyZ)
 11. Pettit et al. 2025 **DisCo-DSO: Coupling Discrete and Continuous Optimization for Efficient Generative Design in Hybrid Spaces.** *AAAI 2025* [Paper](https://arxiv.org/pdf/2412.11051) [Blog Post](https://landajuela.github.io/discrete_continuous_autoregressive/)
 
+# PyTorch RNN Implementation / PyTorch RNN 实现
+
+**NEW:** This repository now includes a PyTorch implementation of the RNN-based policy alongside the original TensorFlow version. The PyTorch implementation provides:
+- Identical functionality to the TensorFlow version
+- Easier debugging with dynamic computation graphs
+- Better integration with modern PyTorch ecosystem
+- Comprehensive bilingual (English/Chinese) documentation
+
+**新增：** 本仓库现在包含了基于RNN策略的PyTorch实现，与原始TensorFlow版本并行。PyTorch实现提供：
+- 与TensorFlow版本相同的功能
+- 使用动态计算图更容易调试
+- 与现代PyTorch生态系统更好的集成
+- 全面的双语（英文/中文）文档
+
+See [`PYTORCH_RNN_GUIDE.md`](PYTORCH_RNN_GUIDE.md) for detailed documentation and [`examples/pytorch_rnn_example.py`](examples/pytorch_rnn_example.py) for usage examples.
+
+详细文档请参阅 [`PYTORCH_RNN_GUIDE.md`](PYTORCH_RNN_GUIDE.md)，使用示例请参阅 [`examples/pytorch_rnn_example.py`](examples/pytorch_rnn_example.py)。
+
 # Installation
 
 ### Installation - Core package
@@ -46,6 +64,13 @@ pip install -e ./dso # Install DSO package and core dependencies
 ```
 
 The `regression` task is installed by default. It doesn't require any of the installation options below.
+
+### Installation - PyTorch RNN Policy (Optional)
+
+To use the PyTorch implementation of the RNN policy, install PyTorch:
+```
+pip install torch>=1.7.0
+```
 
 ### Installation - `control` task
 There are a few additional dependencies to run the `control` task. Install them using:

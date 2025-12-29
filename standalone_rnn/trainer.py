@@ -23,6 +23,7 @@ REINFORCE算法 / REINFORCE Algorithm:
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 import numpy as np
 from typing import Callable, Optional, List, Tuple, Dict
@@ -113,7 +114,10 @@ class PolicyGradientTrainer:
         self.policy.train()
         
         # 步骤1: 采样表达式 / Step 1: Sample expressions
-        actions, observations, probs = self.policy.sample(batch_size, use_prior=True)
+        # 注意：采样过程不需要梯度
+        # Note: Sampling process doesn't need gradients
+        with torch.no_grad():
+            actions, observations, probs = self.policy.sample(batch_size, use_prior=True)
         
         # 步骤2: 评估奖励 / Step 2: Evaluate rewards
         rewards = np.zeros(batch_size)
@@ -131,37 +135,45 @@ class PolicyGradientTrainer:
                 # If expression is invalid, give negative reward
                 rewards[i] = -10.0
         
-        # 步骤3: 计算对数概率 / Step 3: Compute log probabilities
-        log_probs = self.policy.compute_log_probs(actions, observations)
-        
-        # 步骤4: 计算熵 / Step 4: Compute entropy
-        entropy = self.policy.compute_entropy(observations)
-        
-        # 步骤5: 计算基线 / Step 5: Compute baseline
+        # 步骤3: 计算基线 / Step 3: Compute baseline
         if self.baseline_type == 'mean':
             baseline = np.mean(rewards)
         else:
             baseline = 0.0
         
-        # 步骤6: 计算优势 / Step 6: Compute advantages
+        # 步骤4: 计算优势 / Step 4: Compute advantages
         advantages = rewards - baseline
         
-        # 步骤7: 计算策略损失 / Step 7: Compute policy loss
+        # 步骤5: 重新计算对数概率和熵（带梯度）
+        # Step 5: Recompute log probs and entropy (with gradients)
+        
+        # 转换观测和动作为张量 / Convert observations and actions to tensors
+        obs_tensor = torch.FloatTensor(observations).to(self.policy.device)
+        actions_tensor = torch.LongTensor(actions).to(self.policy.device)
+        advantages_tensor = torch.FloatTensor(advantages).unsqueeze(-1).to(self.policy.device)
+        
+        # 前向传播获取logits / Forward pass to get logits
+        logits, _ = self.policy.forward(obs_tensor)  # (batch, seq_len, n_tokens)
+        
+        # 计算log概率 / Compute log probabilities
+        log_probs = F.log_softmax(logits, dim=-1)
+        
+        # 收集选择的动作的log概率 / Gather log probs of taken actions
+        action_log_probs = log_probs.gather(2, actions_tensor.unsqueeze(-1)).squeeze(-1)
+        
+        # 计算概率和熵 / Compute probs and entropy
+        probs = F.softmax(logits, dim=-1)
+        entropy = -(probs * log_probs).sum(dim=-1)
+        
+        # 步骤6: 计算策略损失 / Step 6: Compute policy loss
         # 损失 = -E[log π(a|s) * advantage]
         # Loss = -E[log π(a|s) * advantage]
+        policy_loss = -(action_log_probs * advantages_tensor).mean()
         
-        # 转换为torch张量 / Convert to torch tensors
-        log_probs_tensor = torch.FloatTensor(log_probs).to(self.policy.device)
-        advantages_tensor = torch.FloatTensor(advantages).unsqueeze(-1).to(self.policy.device)
-        entropy_tensor = torch.FloatTensor(entropy).to(self.policy.device)
-        
-        # 策略损失（取负，因为我们要最大化目标）
-        # Policy loss (negated because we want to maximize objective)
-        policy_loss = -(log_probs_tensor * advantages_tensor).mean()
-        
+        # 步骤7: 计算熵损失 / Step 7: Compute entropy loss
         # 熵损失（取负，因为我们要最大化熵）
         # Entropy loss (negated because we want to maximize entropy)
-        entropy_loss = -self.entropy_coef * entropy_tensor.mean()
+        entropy_loss = -self.entropy_coef * entropy.mean()
         
         # 总损失 / Total loss
         total_loss = policy_loss + entropy_loss
@@ -179,7 +191,7 @@ class PolicyGradientTrainer:
         mean_reward = rewards.mean()
         self.train_history['rewards'].append(mean_reward)
         self.train_history['policy_loss'].append(policy_loss.item())
-        self.train_history['entropy'].append(entropy_tensor.mean().item())
+        self.train_history['entropy'].append(entropy.mean().item())
         
         if mean_reward > self.train_history['best_reward']:
             self.train_history['best_reward'] = mean_reward
@@ -189,7 +201,7 @@ class PolicyGradientTrainer:
             'max_reward': rewards.max(),
             'min_reward': rewards.min(),
             'policy_loss': policy_loss.item(),
-            'entropy': entropy_tensor.mean().item(),
+            'entropy': entropy.mean().item(),
             'best_reward': self.train_history['best_reward']
         }
         

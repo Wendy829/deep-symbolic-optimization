@@ -223,7 +223,12 @@ class Expression:
         复杂度 = 所有标记的复杂度之和
         Complexity = sum of complexities of all tokens
         """
-        return sum(self.library.get_token(t).complexity for t in self.tokens)
+        total = 0.0
+        for t in self.tokens:
+            t_int = int(t)
+            if t_int >= 0 and t_int < len(self.library):
+                total += self.library.get_token(t_int).complexity
+        return total
 
 
 class ExpressionBuilder:

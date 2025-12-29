@@ -25,7 +25,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
-from typing import Callable, Optional, List, Tuple
+from typing import Callable, Optional, List, Tuple, Dict
 
 from .rnn_policy import RNNPolicy
 from .expression_tree import Expression

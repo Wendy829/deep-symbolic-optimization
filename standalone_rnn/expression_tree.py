@@ -114,24 +114,21 @@ class Expression:
         
         实现方式 / Implementation:
         ----------------------
-        使用栈进行后序评估：
-        Use stack for post-order evaluation:
-        1. 遍历前序序列
-           Traverse pre-order sequence
-        2. 对每个标记，放入栈中
-           For each token, put it on stack
-        3. 当栈顶有足够的参数时，执行函数
-           When stack top has enough arguments, execute function
+        使用递归方法评估前序遍历的表达式树
+        Use recursive approach to evaluate pre-order traversed expression tree
         """
-        # 栈用于存储部分计算结果
-        # Stack to store partial computation results
-        stack = []
+        # 使用列表来跟踪遍历位置（列表在闭包中是可变的）
+        # Use list to track traversal position (lists are mutable in closures)
+        eval_index = [0]
         
-        # 用于跟踪每个栈元素需要的参数数量
-        # Track number of arguments needed for each stack element
-        args_needed = []
-        
-        for token_idx in self.tokens:
+        def eval_recursive():
+            """递归评估子树 / Recursively evaluate subtree"""
+            if eval_index[0] >= len(self.tokens):
+                return np.zeros(X.shape[0])
+            
+            token_idx = int(self.tokens[eval_index[0]])
+            eval_index[0] += 1
+            
             token = self.library.get_token(token_idx)
             
             if token.arity == 0:
@@ -141,69 +138,32 @@ class Expression:
                     # 提取变量索引，如 'x1' -> 0
                     # Extract variable index, e.g., 'x1' -> 0
                     var_idx = int(token.name[1:]) - 1
-                    value = X[:, var_idx]
-                    stack.append(value)
-                    args_needed.append(0)  # 不需要更多参数
+                    if var_idx < X.shape[1]:
+                        return X[:, var_idx]
+                    else:
+                        return np.zeros(X.shape[0])
                 else:
                     # 常量（如果有的话）
                     # Constants (if any)
-                    value = token()
-                    stack.append(np.full(X.shape[0], value))
-                    args_needed.append(0)
+                    return np.full(X.shape[0], 0.0)
             else:
-                # 函数节点：需要参数
-                # Function node: needs arguments
-                stack.append(token)
-                args_needed.append(token.arity)
-            
-            # 尝试执行栈顶的函数
-            # Try to execute function at stack top
-            while len(args_needed) >= 2 and args_needed[-2] > 0:
-                # 栈顶是一个值，栈顶-1需要参数
-                # Stack top is a value, stack top-1 needs arguments
-                if args_needed[-1] != 0:
-                    break  # 栈顶也需要参数，不能用它
-                    # Stack top also needs arguments, can't use it
+                # 函数节点：递归评估所有参数
+                # Function node: recursively evaluate all arguments
+                args = []
+                for _ in range(token.arity):
+                    arg_value = eval_recursive()
+                    args.append(arg_value)
                 
-                # 弹出参数 / Pop argument
-                arg = stack.pop()
-                args_needed.pop()
-                
-                # 获取函数 / Get function
-                func = stack[-1]
-                args_needed[-1] -= 1
-                
-                if args_needed[-1] == 0:
-                    # 函数已收集所有参数，执行它
-                    # Function has collected all arguments, execute it
-                    if isinstance(func, Token):
-                        # 收集所有参数 / Collect all arguments
-                        n_args = func.arity
-                        args = [arg]
-                        
-                        # 从栈中获取其他参数 / Get other arguments from stack
-                        for _ in range(n_args - 1):
-                            stack.pop()
-                            args_needed.pop()
-                            args.insert(0, stack[-1] if not isinstance(stack[-1], Token) else None)
-                        
-                        # 执行函数 / Execute function
-                        result = func(*args)
-                        stack[-1] = result
-                        args_needed[-1] = 0
+                # 执行函数 / Execute function
+                try:
+                    return token(*args)
+                except Exception:
+                    return np.zeros(X.shape[0])
         
-        # 栈顶应该是最终结果
-        # Stack top should be the final result
-        if len(stack) == 0:
+        try:
+            return eval_recursive()
+        except Exception:
             return np.zeros(X.shape[0])
-        
-        result = stack[-1]
-        if isinstance(result, Token):
-            # 不应该发生，但作为保护
-            # Shouldn't happen, but as a safeguard
-            return np.zeros(X.shape[0])
-        
-        return result
     
     def to_string(self) -> str:
         """
@@ -216,29 +176,37 @@ class Expression:
             表达式的字符串表示，如 "add(x1, sin(x2))"
             String representation of expression, e.g., "add(x1, sin(x2))"
         """
-        stack = []
+        # 使用列表来跟踪遍历位置
+        # Use list to track traversal position
+        str_index = [0]
         
-        for token_idx in self.tokens:
+        def build_string_recursive():
+            """递归构建字符串 / Recursively build string"""
+            if str_index[0] >= len(self.tokens):
+                return "empty"
+            
+            token_idx = int(self.tokens[str_index[0]])
+            str_index[0] += 1
+            
             token = self.library.get_token(token_idx)
             
             if token.arity == 0:
                 # 终端节点 / Terminal node
-                stack.append(token.name)
+                return token.name
             else:
                 # 函数节点，收集参数 / Function node, collect arguments
                 args = []
                 for _ in range(token.arity):
-                    if stack:
-                        args.insert(0, stack.pop())
+                    arg_str = build_string_recursive()
+                    args.append(arg_str)
                 
                 # 构建函数调用字符串 / Build function call string
-                if len(args) == token.arity:
-                    expr_str = f"{token.name}({', '.join(args)})"
-                else:
-                    expr_str = f"{token.name}(...)"
-                stack.append(expr_str)
+                return f"{token.name}({', '.join(args)})"
         
-        return stack[0] if stack else "empty"
+        try:
+            return build_string_recursive()
+        except Exception:
+            return "invalid_expr"
     
     def __str__(self):
         return self.to_string()

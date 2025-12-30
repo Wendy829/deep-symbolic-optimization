@@ -55,7 +55,12 @@ class PolicyGradientTrainer:
                  reward_function: Callable,
                  learning_rate: float = 0.001,
                  entropy_coef: float = 0.01,
-                 baseline_type: str = 'mean'):
+                 baseline_type: str = 'mean',
+                 temperature: float = 1.0,
+                 epsilon: float = 0.0,
+                 lr_scheduler_type: Optional[str] = None,
+                 lr_decay_rate: float = 0.95,
+                 lr_decay_steps: int = 1000):
         """
         参数 / Parameters:
         ----------------
@@ -88,14 +93,48 @@ class PolicyGradientTrainer:
         baseline_type: str
             基线类型: 'mean', 'none'
             Baseline type: 'mean', 'none'
+            
+        temperature: float
+            采样温度，控制随机性 (temperature > 1.0 增加探索)
+            Sampling temperature, controls randomness (temperature > 1.0 increases exploration)
+            
+        epsilon: float
+            Epsilon-greedy探索率 (0.0-1.0)，以epsilon概率随机采样
+            Epsilon-greedy exploration rate (0.0-1.0), random sample with epsilon probability
+            
+        lr_scheduler_type: Optional[str]
+            学习率调度类型: 'step', 'exponential', 'cosine', None
+            Learning rate scheduler type: 'step', 'exponential', 'cosine', None
+            
+        lr_decay_rate: float
+            学习率衰减率
+            Learning rate decay rate
+            
+        lr_decay_steps: int
+            学习率衰减步数间隔
+            Steps between learning rate decay
         """
         self.policy = policy
         self.reward_function = reward_function
         self.entropy_coef = entropy_coef
         self.baseline_type = baseline_type
+        self.temperature = temperature
+        self.epsilon = epsilon
         
         # 优化器 / Optimizer
         self.optimizer = optim.Adam(policy.parameters(), lr=learning_rate)
+        
+        # 学习率调度器 / Learning rate scheduler
+        self.lr_scheduler = None
+        if lr_scheduler_type == 'step':
+            self.lr_scheduler = optim.lr_scheduler.StepLR(
+                self.optimizer, step_size=lr_decay_steps, gamma=lr_decay_rate)
+        elif lr_scheduler_type == 'exponential':
+            self.lr_scheduler = optim.lr_scheduler.ExponentialLR(
+                self.optimizer, gamma=lr_decay_rate)
+        elif lr_scheduler_type == 'cosine':
+            self.lr_scheduler = optim.lr_scheduler.CosineAnnealingLR(
+                self.optimizer, T_max=lr_decay_steps)
         
         # 训练统计 / Training statistics
         self.train_history = {
@@ -204,6 +243,10 @@ class PolicyGradientTrainer:
         torch.nn.utils.clip_grad_norm_(self.policy.parameters(), max_norm=1.0)
         
         self.optimizer.step()
+        
+        # 更新学习率 / Update learning rate
+        if self.lr_scheduler is not None:
+            self.lr_scheduler.step()
         
         # 记录统计 / Record statistics
         mean_reward = rewards.mean()

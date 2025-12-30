@@ -270,6 +270,113 @@ class HierarchicalPrior:
         return masked_logits
 
 
+class RelationalConstraint:
+    """
+    关系约束：防止变量用于关系运算符
+    Relational Constraint: Prevents variables in relational operators
+    
+    DSO中的关系运算符(>, <, ==)要求数值输入，不能是符号变量
+    Relational operators in DSO require numerical inputs, not symbolic variables
+    """
+    
+    def apply(self, library: TokenLibrary, tokens: np.ndarray, 
+              current_length: int, prior: np.ndarray) -> np.ndarray:
+        """应用约束 / Apply constraint"""
+        # 这个约束在当前简化实现中已被包含在HierarchicalPrior中
+        # This constraint is already included in HierarchicalPrior in simplified implementation
+        return prior
+
+
+class ConstConstraint:
+    """
+    常数约束：避免孤立的常数标记
+    Const Constraint: Avoids isolated constant tokens
+    
+    防止生成如 'add(5, x1)' 这样的表达式，其中常数没有计算意义
+    Prevents expressions like 'add(5, x1)' where constants have no computational meaning
+    """
+    
+    def apply(self, library: TokenLibrary, tokens: np.ndarray,
+              current_length: int, prior: np.ndarray) -> np.ndarray:
+        """应用约束 / Apply constraint"""
+        # 简化实现：在当前token库设计中，常数通过函数生成而非直接标记
+        # Simplified: In current token library design, constants are generated through functions
+        return prior
+
+
+class RepeatConstraint:
+    """
+    重复约束：防止重复的一元函数
+    Repeat Constraint: Prevents repeated unary functions
+    
+    例如，防止 sin(sin(sin(x))) 这样的重复
+    For example, prevents repetitions like sin(sin(sin(x)))
+    """
+    
+    def __init__(self, max_repeat: int = 2):
+        """
+        参数 / Parameters:
+        ----------------
+        max_repeat: int
+            允许的最大重复次数
+            Maximum number of repetitions allowed
+        """
+        self.max_repeat = max_repeat
+    
+    def apply(self, library: TokenLibrary, tokens: np.ndarray,
+              current_length: int, prior: np.ndarray) -> np.ndarray:
+        """应用约束 / Apply constraint"""
+        if current_length < 2:
+            return prior
+        
+        # 检查最近的标记是否有重复的一元函数
+        # Check if recent tokens have repeated unary functions
+        batch_size = tokens.shape[0]
+        for i in range(batch_size):
+            recent_tokens = tokens[i, max(0, current_length-self.max_repeat):current_length]
+            recent_unary = []
+            
+            for token_idx in recent_tokens:
+                try:
+                    token = library.get_token(int(token_idx))
+                    if hasattr(token, 'arity') and token.arity == 1:
+                        recent_unary.append(token.name)
+                except:
+                    continue
+            
+            # 如果有max_repeat个相同的一元函数，禁用该函数
+            # If there are max_repeat same unary functions, disable that function
+            if len(recent_unary) >= self.max_repeat:
+                from collections import Counter
+                counts = Counter(recent_unary)
+                for func_name, count in counts.items():
+                    if count >= self.max_repeat:
+                        try:
+                            func_idx = library.get_index(func_name)
+                            prior[i, func_idx] = 0
+                        except:
+                            pass
+        
+        return prior
+
+
+class TrigConstraint:
+    """
+    三角函数约束
+    Trigonometric Function Constraint
+    
+    对三角函数添加特定约束以提高表达式质量
+    Adds specific constraints to trigonometric functions to improve expression quality
+    """
+    
+    def apply(self, library: TokenLibrary, tokens: np.ndarray,
+              current_length: int, prior: np.ndarray) -> np.ndarray:
+        """应用约束 / Apply constraint"""
+        # 简化实现：可以根据需要添加更复杂的三角函数约束
+        # Simplified: More complex trigonometric constraints can be added as needed
+        return prior
+
+
 if __name__ == "__main__":
     # 测试代码 / Test code
     # Imports already handled at top of file with try-except

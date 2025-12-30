@@ -203,8 +203,45 @@ def visualize_results(expressions_and_rewards, X, y, save_path: str = None):
         print(f"可视化失败 / Visualization failed: {e}")
 
 
-def main():
-    """主函数 / Main function"""
+def main(
+    # RNN 参数 / RNN Parameters
+    hidden_size=64,          # RNN隐藏层大小 / RNN hidden size
+    num_layers=1,            # RNN层数 / Number of RNN layers
+    cell_type='lstm',        # RNN类型: 'lstm' 或 'gru' / RNN type: 'lstm' or 'gru'
+    max_length=15,           # 最大表达式长度 / Maximum expression length
+    
+    # 训练参数 / Training Parameters  
+    batch_size=50,           # 批次大小 / Batch size
+    num_iterations=200,      # 训练轮数 / Number of training iterations
+    learning_rate=0.001,     # 学习率 / Learning rate
+    temperature=1.0,         # 采样温度(>1增加探索) / Sampling temperature (>1 increases exploration)
+    epsilon=0.0,             # Epsilon-greedy探索率 / Epsilon-greedy exploration rate
+    entropy_coef=0.01,       # 熵系数 / Entropy coefficient
+    lr_scheduler='cosine',   # 学习率调度: 'step', 'exponential', 'cosine', None
+    
+    # 数据参数 / Data Parameters
+    n_samples=100,           # 样本数 / Number of samples
+    noise_std=0.01,          # 噪声标准差 / Noise standard deviation
+    
+    # 任务参数 / Task Parameters
+    use_task_class=True,     # 是否使用SymbolicRegressionTask / Whether to use SymbolicRegressionTask
+    metric='inv_nrmse',      # 奖励指标 / Reward metric
+    complexity_penalty=0.005 # 复杂度惩罚 / Complexity penalty
+):
+    """
+    主函数 / Main function
+    
+    完整的符号回归训练示例，所有参数可配置
+    Complete symbolic regression training example with all parameters configurable
+    
+    参数说明 / Parameter Description:
+    --------------------------------
+    可以通过修改上述参数来调试和实验不同的配置
+    You can modify the above parameters to debug and experiment with different configurations
+    
+    示例 / Example:
+    main(hidden_size=128, batch_size=100, num_iterations=500, learning_rate=0.0005)
+    """
     
     print("="*70)
     print("独立RNN符号回归示例 / Standalone RNN Symbolic Regression Example")
@@ -216,9 +253,10 @@ def main():
     print("\n步骤1: 生成数据 / Step 1: Generating Data")
     print("-" * 70)
     
-    X_train, y_train = generate_data(n_samples=100)
+    X_train, y_train = generate_data(n_samples=n_samples, noise_std=noise_std)
     print(f"训练数据形状 / Training data shape: X={X_train.shape}, y={y_train.shape}")
     print(f"目标函数 / Target function: y = x1^2 + x2")
+    print(f"样本数 / Samples: {n_samples}, 噪声 / Noise: {noise_std}")
     print(f"X范围 / X range: [{X_train.min():.2f}, {X_train.max():.2f}]")
     print(f"y范围 / y range: [{y_train.min():.2f}, {y_train.max():.2f}]")
     
@@ -235,7 +273,6 @@ def main():
     print(f"  变量 / Variables: {[lib.get_token(i).name for i in lib.terminal_tokens]}")
     
     # 创建先验 / Create prior
-    max_length = 15
     prior = HierarchicalPrior(lib, max_length=max_length)
     print(f"\n层次先验 / Hierarchical prior: max_length={max_length}")
     
@@ -248,6 +285,9 @@ def main():
         library=lib,
         prior=prior,
         state_manager=state_mgr,
+        hidden_size=hidden_size,
+        num_layers=num_layers,
+        cell_type=cell_type
         hidden_size=64,
         num_layers=1,
         cell_type='lstm',
@@ -267,19 +307,37 @@ def main():
     print("Step 3: Creating Reward Function and Trainer")
     print("-" * 70)
     
-    reward_fn = create_reward_function(X_train, y_train)
-    print("奖励函数 / Reward function: -MSE - 0.01 * complexity")
+    # 创建奖励函数 / Create reward function
+    if use_task_class:
+        try:
+            from standalone_rnn.task import SymbolicRegressionTask
+            task = SymbolicRegressionTask(X_train, y_train, metric=metric,
+                                         complexity_penalty=complexity_penalty)
+            reward_fn = task.reward
+            print(f"奖励函数 / Reward function: SymbolicRegressionTask with metric={metric}")
+        except ImportError:
+            reward_fn = create_reward_function(X_train, y_train)
+            print("奖励函数 / Reward function: -MSE - 0.01 * complexity")
+    else:
+        reward_fn = create_reward_function(X_train, y_train)
+        print("奖励函数 / Reward function: -MSE - 0.01 * complexity")
     
     trainer = PolicyGradientTrainer(
         policy=policy,
         reward_function=reward_fn,
-        learning_rate=0.001,
-        entropy_coef=0.005,
-        baseline_type='mean'
+        learning_rate=learning_rate,
+        entropy_coef=entropy_coef,
+        baseline_type='mean',
+        temperature=temperature,
+        epsilon=epsilon,
+        lr_scheduler_type=lr_scheduler
     )
     print(f"训练器 / Trainer: REINFORCE with baseline")
-    print(f"  学习率 / Learning rate: 0.001")
-    print(f"  熵系数 / Entropy coef: 0.005")
+    print(f"  学习率 / Learning rate: {learning_rate}")
+    print(f"  熵系数 / Entropy coef: {entropy_coef}")
+    print(f"  温度 / Temperature: {temperature}")
+    print(f"  探索率 / Epsilon: {epsilon}")
+    print(f"  LR调度 / LR scheduler: {lr_scheduler}")
     
     # ============================================
     # 步骤4: 训练策略 / Step 4: Train Policy
@@ -287,8 +345,6 @@ def main():
     print("\n步骤4: 训练策略 / Step 4: Training Policy")
     print("-" * 70)
     
-    num_iterations = 50
-    batch_size = 20
     print(f"训练配置 / Training config:")
     print(f"  迭代次数 / Iterations: {num_iterations}")
     print(f"  批次大小 / Batch size: {batch_size}")

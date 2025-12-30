@@ -22,10 +22,17 @@ __author__ = "Standalone RNN Implementation"
 
 from .token_library import TokenLibrary, Token, create_default_library
 from .expression_tree import Expression, ExpressionBuilder
-from .prior import HierarchicalPrior
+from .prior import (
+    HierarchicalPrior, 
+    RelationalConstraint, 
+    ConstConstraint, 
+    RepeatConstraint, 
+    TrigConstraint
+)
 from .state_manager import StateManager
 from .rnn_policy import RNNPolicy
 from .trainer import PolicyGradientTrainer
+from .task import SymbolicRegressionTask
 
 __all__ = [
     'TokenLibrary',
@@ -34,7 +41,12 @@ __all__ = [
     'Expression',
     'ExpressionBuilder',
     'HierarchicalPrior',
+    'RelationalConstraint',
+    'ConstConstraint',
+    'RepeatConstraint',
+    'TrigConstraint',
     'StateManager',
     'RNNPolicy',
-    'PolicyGradientTrainer'
+    'PolicyGradientTrainer',
+    'SymbolicRegressionTask'
 ]

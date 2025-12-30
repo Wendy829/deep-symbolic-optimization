@@ -42,15 +42,22 @@ def main():
     print(f"   ✓ RNN策略: {sum(p.numel() for p in policy.parameters())} 参数")
     
     # 定义奖励函数 / Define reward function
+    # 使用类似DSO的正值奖励（越高越好）
+    # Use DSO-style positive reward (higher is better)
     def reward_fn(expr):
         try:
             y_pred = expr.evaluate(X)
-            mse = np.mean((y - y_pred)**2)
-            return -mse - 0.01 * expr.complexity()
+            nmse = np.mean((y - y_pred)**2) / np.var(y)
+            # 类似DSO的inv_nrmse: 1/(1+NRMSE), 范围[0,1]
+            # Similar to DSO's inv_nrmse: 1/(1+NRMSE), range [0,1]
+            reward = 1.0 / (1.0 + np.sqrt(nmse))
+            # 添加复杂度惩罚 / Add complexity penalty
+            reward -= 0.01 * expr.complexity()
+            return reward
         except:
-            return -100.0
+            return 0.0  # 失败时返回最低奖励 / Return lowest reward on failure
     
-    print("   ✓ 奖励函数: -MSE - 0.01*复杂度")
+    print("   ✓ 奖励函数: 1/(1+NRMSE) - 0.01*复杂度 (类似DSO / Like DSO)")
     
     # 训练 / Train
     print("\n3. 训练 / Training...")

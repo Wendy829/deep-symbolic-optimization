@@ -187,32 +187,48 @@ class HierarchicalPrior:
         参数 / Parameters:
         ----------------
         tokens: np.ndarray, shape (batch_size, length)
-            标记序列
-            Token sequences
+            标记序列（可能包含填充的0）
+            Token sequences (may contain padding zeros)
         
         返回 / Returns:
         -------------
         complete: np.ndarray, shape (batch_size,)
             布尔数组，表示每个表达式是否完成
             Boolean array indicating if each expression is complete
+            
+        注意 / Note:
+        ----------
+        由于标记索引0是有效的（通常是'add'），我们通过计算dangling来确定完成位置，
+        而不是依赖0作为填充标记。
+        Since token index 0 is valid (usually 'add'), we determine completion by 
+        calculating dangling, not by relying on 0 as padding marker.
         """
         batch_size = tokens.shape[0]
         complete = np.zeros(batch_size, dtype=bool)
         
         for i in range(batch_size):
-            # 找到第一个0（填充）的位置
-            # Find position of first 0 (padding)
-            valid_tokens = tokens[i][tokens[i] != 0]
-            if len(valid_tokens) == 0:
-                continue
-            
-            # 计算悬空 / Calculate dangling
-            token_arities = self.arities[valid_tokens]
-            dangling = 1 + np.sum(token_arities - 1)
-            
-            # 如果悬空为0，表达式完成
-            # If dangling is 0, expression is complete
-            complete[i] = (dangling == 0)
+            # 从左到右计算累积dangling，找到第一个dangling=0的位置
+            # Calculate cumulative dangling from left to right, find first position where dangling=0
+            dangling = 1
+            for j in range(len(tokens[i])):
+                token_idx = tokens[i, j]
+                # 跳过负数索引（如果有的话）
+                # Skip negative indices if any
+                if token_idx < 0:
+                    break
+                
+                arity = self.arities[token_idx]
+                dangling += arity - 1
+                
+                if dangling == 0:
+                    # 表达式在位置j完成
+                    # Expression completes at position j
+                    complete[i] = True
+                    break
+                elif dangling < 0:
+                    # 不应该发生：dangling变为负数
+                    # Should not happen: dangling becomes negative
+                    break
         
         return complete
     

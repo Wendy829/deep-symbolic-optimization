@@ -67,6 +67,16 @@ class PolicyGradientTrainer:
             奖励函数，接收Expression对象，返回标量奖励
             Reward function, takes Expression object, returns scalar reward
             
+            **注意 / Note:** 奖励应该设计为"越高越好"。
+            原始DSO项目使用正值奖励（如 1/(1+NMSE)，范围[0,1]）。
+            本实现也可使用负值奖励（如 -MSE），但需要理解"越高越好"
+            意味着更接近0的负数更好。
+            
+            Rewards should be designed as "higher is better".
+            Original DSO uses positive rewards (e.g., 1/(1+NMSE), range [0,1]).
+            This implementation can also use negative rewards (e.g., -MSE), but
+            understand "higher is better" means less negative is better.
+            
         learning_rate: float
             学习率
             Learning rate

@@ -94,8 +94,13 @@ def create_reward_function(X: np.ndarray, y: np.ndarray):
         Evaluate reward of expression
         
         奖励组成 / Reward components:
-        1. 拟合质量: -MSE (均方误差)
-           Fitting quality: -MSE (mean squared error)
+        采用类似原始DSO的inv_nrmse度量
+        Uses inv_nrmse metric similar to original DSO
+        
+        1. 拟合质量: 1/(1+NRMSE) (归一化均方根误差的倒数)
+           Fitting quality: 1/(1+NRMSE) (inverse of normalized root MSE)
+           范围 / Range: [0, 1], 越高越好 / higher is better
+        
         2. 复杂度惩罚: -0.01 * complexity
            Complexity penalty: -0.01 * complexity
         """
@@ -103,20 +108,22 @@ def create_reward_function(X: np.ndarray, y: np.ndarray):
             # 评估表达式 / Evaluate expression
             y_pred = expr.evaluate(X)
             
-            # 计算MSE / Compute MSE
+            # 计算NMSE (归一化均方误差) / Compute NMSE (normalized MSE)
             mse = np.mean((y - y_pred) ** 2)
+            var_y = np.var(y)
+            nmse = mse / (var_y + 1e-10)  # 避免除零 / Avoid division by zero
             
-            # 计算复杂度惩罚 / Compute complexity penalty
+            # 计算inv_nrmse (类似DSO) / Compute inv_nrmse (like DSO)
+            # 范围[0,1]，越高越好 / Range [0,1], higher is better
+            reward = 1.0 / (1.0 + np.sqrt(nmse))
+            
+            # 添加复杂度惩罚 / Add complexity penalty
             complexity_penalty = 0.01 * expr.complexity()
-            
-            # 总奖励 / Total reward
-            # 使用负MSE，因为我们要最小化误差
-            # Use negative MSE because we want to minimize error
-            reward = -mse - complexity_penalty
+            reward -= complexity_penalty
             
             # 避免NaN / Avoid NaN
             if np.isnan(reward) or np.isinf(reward):
-                reward = -100.0
+                reward = 0.0  # 失败时返回最低奖励 / Return lowest reward on failure
             
             return reward
         except Exception as e:

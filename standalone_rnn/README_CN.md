@@ -220,10 +220,12 @@ print(f"终端标记: {lib.terminal_tokens}")
 
 **关键方法:**
 ```python
-expr = Expression([0, 2, 4, 3], lib)  # [add, x1, sin, x2]
-y = expr.evaluate(X)                  # 在数据上评估
-print(expr.to_string())               # "add(x1, sin(x2))"
-print(expr.complexity())              # 5.5
+# 标记索引: 0-9是函数, 10-11是x1和x2
+# Token indices: 0-9 are functions, 10-11 are x1 and x2
+expr = Expression([0, 10, 4, 11], lib)  # [add, x1, sin, x2]
+y = expr.evaluate(X)                    # 在数据上评估
+print(expr.to_string())                 # "add(x1, sin(x2))"
+print(expr.complexity())                # 5.5
 ```
 
 **实现细节:**

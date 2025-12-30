@@ -262,6 +262,17 @@ class RNNPolicy(nn.Module):
                 
                 # 计算概率 / Compute probabilities
                 prob = torch.softmax(torch.FloatTensor(logits_np), dim=-1).numpy()
+                
+                # 确保概率严格归一化，处理数值误差
+                # Ensure probabilities are strictly normalized, handle numerical errors
+                prob = np.maximum(prob, 0)  # 确保非负 / Ensure non-negative
+                prob_sum = prob.sum(axis=-1, keepdims=True)
+                
+                # 处理全0的情况（所有标记都被掩码）
+                # Handle case where all tokens are masked (all zeros)
+                prob_sum = np.where(prob_sum > 0, prob_sum, 1.0)
+                prob = prob / prob_sum  # 严格归一化 / Strict normalization
+                
                 probs[:, t, :] = prob
                 
                 # 采样动作 / Sample actions
@@ -270,7 +281,19 @@ class RNNPolicy(nn.Module):
                         actions[i, t] = 0  # 填充 / Padding
                     else:
                         # 从概率分布采样 / Sample from probability distribution
-                        action = np.random.choice(self.n_tokens, p=prob[i])
+                        # 再次检查并修正数值误差 / Double-check and fix numerical errors
+                        p = prob[i]
+                        p = np.maximum(p, 0)  # 确保非负 / Ensure non-negative
+                        p_sum = p.sum()
+                        
+                        if p_sum > 0:
+                            p = p / p_sum  # 严格归一化 / Strict normalization
+                            action = np.random.choice(self.n_tokens, p=p)
+                        else:
+                            # 如果所有概率为0，随机选择一个终端标记
+                            # If all probabilities are 0, randomly choose a terminal token
+                            action = np.random.choice(self.library.terminal_tokens)
+                        
                         actions[i, t] = action
                 
                 # 检查哪些样本已完成 / Check which samples are complete

@@ -28,8 +28,17 @@ import torch.optim as optim
 import numpy as np
 from typing import Callable, Optional, List, Tuple, Dict
 
-from .rnn_policy import RNNPolicy
-from .expression_tree import Expression
+# Handle imports for both package and direct script execution
+# 处理包导入和直接脚本执行的导入
+try:
+    from .rnn_policy import RNNPolicy
+    from .expression_tree import Expression
+except ImportError:
+    import sys
+    import os
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from standalone_rnn.rnn_policy import RNNPolicy
+    from standalone_rnn.expression_tree import Expression
 
 
 class PolicyGradientTrainer:
@@ -294,11 +303,13 @@ class PolicyGradientTrainer:
 
 if __name__ == "__main__":
     # 测试代码 / Test code
-    from .token_library import create_default_library
-    from .prior import HierarchicalPrior
-    from .state_manager import StateManager
-    from .rnn_policy import RNNPolicy
-    from .expression_tree import Expression
+    # Imports already handled at top of file with try-except
+    # 导入已在文件顶部通过try-except处理
+    from standalone_rnn.token_library import create_default_library
+    from standalone_rnn.prior import HierarchicalPrior
+    from standalone_rnn.state_manager import StateManager
+    from standalone_rnn.rnn_policy import RNNPolicy
+    from standalone_rnn.expression_tree import Expression
     
     print("="*60)
     print("策略梯度训练器测试 / Policy Gradient Trainer Test")

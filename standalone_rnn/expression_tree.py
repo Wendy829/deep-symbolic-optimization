@@ -13,7 +13,16 @@ Implements tree representation and execution of symbolic mathematical expression
 
 import numpy as np
 from typing import List, Optional, Tuple
-from .token_library import TokenLibrary, Token
+
+# Handle imports for both package and direct script execution
+# 处理包导入和直接脚本执行的导入
+try:
+    from .token_library import TokenLibrary, Token
+except ImportError:
+    import sys
+    import os
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from standalone_rnn.token_library import TokenLibrary, Token
 
 
 class Expression:
@@ -297,7 +306,9 @@ class ExpressionBuilder:
 
 if __name__ == "__main__":
     # 测试代码 / Test code
-    from .token_library import create_default_library
+    # Imports already handled at top of file with try-except
+    # 导入已在文件顶部通过try-except处理
+    from standalone_rnn.token_library import create_default_library
     
     print("="*60)
     print("表达式树测试 / Expression Tree Test")

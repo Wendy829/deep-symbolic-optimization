@@ -100,8 +100,10 @@ class TokenLibrary:
         通过名称或索引获取标记
         Get token by name or index
         """
-        if isinstance(name_or_index, int):
-            return self.tokens[name_or_index]
+        # Handle both int and numpy integer types
+        # 处理int和numpy整数类型
+        if isinstance(name_or_index, (int, np.integer)):
+            return self.tokens[int(name_or_index)]
         elif isinstance(name_or_index, str):
             index = self.name_to_index[name_or_index]
             return self.tokens[index]

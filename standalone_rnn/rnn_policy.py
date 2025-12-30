@@ -19,9 +19,21 @@ import torch.nn.functional as F
 import numpy as np
 from typing import Tuple, Optional, Dict
 
-from .token_library import TokenLibrary
-from .prior import HierarchicalPrior
-from .state_manager import StateManager
+# Handle imports for both package and direct script execution
+# 处理包导入和直接脚本执行的导入
+try:
+    from .token_library import TokenLibrary
+    from .prior import HierarchicalPrior
+    from .state_manager import StateManager
+except ImportError:
+    # If running as script, add parent directory to path
+    # 如果作为脚本运行，将父目录添加到路径
+    import sys
+    import os
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from standalone_rnn.token_library import TokenLibrary
+    from standalone_rnn.prior import HierarchicalPrior
+    from standalone_rnn.state_manager import StateManager
 
 
 class RNNPolicy(nn.Module):
@@ -357,7 +369,15 @@ class RNNPolicy(nn.Module):
 
 if __name__ == "__main__":
     # 测试代码 / Test code
-    from .token_library import create_default_library
+    import sys
+    import os
+    # Add parent directory to path for imports when running as script
+    # 运行脚本时将父目录添加到路径以进行导入
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    
+    from standalone_rnn.token_library import create_default_library
+    from standalone_rnn.prior import HierarchicalPrior
+    from standalone_rnn.state_manager import StateManager
     
     print("="*60)
     print("RNN策略网络测试 / RNN Policy Network Test")
@@ -401,7 +421,13 @@ if __name__ == "__main__":
         valid_len = np.where(actions[i] == 0)[0]
         valid_len = valid_len[0] if len(valid_len) > 0 else len(actions[i])
         
-        token_names = [lib.get_token(a).name for a in actions[i, :valid_len]]
+        # Filter out invalid token indices and get names
+        # 过滤无效的标记索引并获取名称
+        token_names = []
+        for a in actions[i, :valid_len]:
+            a_int = int(a)
+            if 0 <= a_int < lib.n_tokens:
+                token_names.append(lib.get_token(a_int).name)
         print(f"  {i+1}. {token_names}")
     
     # 测试2: 计算对数概率

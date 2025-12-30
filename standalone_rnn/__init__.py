@@ -20,7 +20,7 @@ all modules are independently implemented.
 __version__ = "1.0.0"
 __author__ = "Standalone RNN Implementation"
 
-from .token_library import TokenLibrary, Token
+from .token_library import TokenLibrary, Token, create_default_library
 from .expression_tree import Expression, ExpressionBuilder
 from .prior import HierarchicalPrior
 from .state_manager import StateManager
@@ -30,6 +30,7 @@ from .trainer import PolicyGradientTrainer
 __all__ = [
     'TokenLibrary',
     'Token',
+    'create_default_library',
     'Expression',
     'ExpressionBuilder',
     'HierarchicalPrior',

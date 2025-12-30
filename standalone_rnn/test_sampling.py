@@ -48,8 +48,7 @@ def test_sampling():
     lib = create_default_library(n_input_vars=n_input_vars)
     
     print(f"Token总数 / Total tokens: {lib.n_tokens}")
-    print(f"函数数量 / Number of functions: {len(lib.functions)}")
-    print(f"变量数量 / Number of variables: {n_input_vars}")
+    print(f"输入变量数 / Number of input variables: {n_input_vars}")
     print()
     
     # 打印所有Token / Print all tokens
@@ -199,17 +198,21 @@ def test_sampling():
     print("=" * 80)
     
     # 计算采样表达式的对数概率 / Compute log probabilities of sampled expressions
-    log_probs = policy.compute_log_probs(actions, obs, probs, lengths)
+    # compute_log_probs只需要actions和observations两个参数
+    # compute_log_probs only needs actions and observations
+    log_probs = policy.compute_log_probs(actions, obs)
     
-    print(f"对数概率形状 / Log probs shape: {log_probs.shape}")  # (batch_size,)
-    print(f"平均对数概率 / Mean log prob: {log_probs.mean().item():.4f}")
-    print(f"对数概率范围 / Log prob range: [{log_probs.min().item():.4f}, {log_probs.max().item():.4f}]")
+    print(f"对数概率形状 / Log probs shape: {log_probs.shape}")  # (batch_size, max_length)
+    print(f"平均对数概率 / Mean log prob: {log_probs.mean():.4f}")
+    print(f"对数概率范围 / Log prob range: [{log_probs.min():.4f}, {log_probs.max():.4f}]")
     print()
     
-    # 显示每个表达式的对数概率 / Show log prob for each expression
-    print("各表达式的对数概率 / Log probability for each expression:")
+    # 显示每个表达式的平均对数概率 / Show average log prob for each expression
+    print("各表达式的平均对数概率 / Average log probability for each expression:")
     for i in range(batch_size):
-        print(f"  表达式 {i+1}: {log_probs[i].item():.4f}")
+        # 只计算有效长度内的对数概率 / Only compute log prob for valid length
+        expr_log_prob = log_probs[i, :lengths[i]].mean()
+        print(f"  表达式 {i+1}: {expr_log_prob:.4f}")
     print()
     
     # ========================================================================
@@ -220,9 +223,11 @@ def test_sampling():
     print("=" * 80)
     
     # 计算策略熵 (衡量策略的随机性) / Compute policy entropy (measures randomness)
-    entropy = policy.compute_entropy(probs, lengths)
+    # compute_entropy只需要observations参数
+    # compute_entropy only needs observations parameter
+    entropy = policy.compute_entropy(obs)
     
-    print(f"策略熵 / Policy entropy: {entropy.item():.4f}")
+    print(f"策略熵 / Policy entropy: {entropy.mean():.4f}")
     print("熵越高，策略越随机 / Higher entropy means more random policy")
     print("熵越低，策略越确定 / Lower entropy means more deterministic policy")
     print()

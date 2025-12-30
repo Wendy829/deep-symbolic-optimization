@@ -153,16 +153,14 @@ def test_training():
         policy=policy,
         reward_function=reward_function,
         learning_rate=0.001,      # 学习率 / Learning rate
-        entropy_weight=0.01,      # 熵权重 (鼓励探索) / Entropy weight (encourages exploration)
-        baseline_weight=0.9,      # 基线权重 (减少方差) / Baseline weight (reduces variance)
-        max_grad_norm=1.0        # 梯度裁剪 / Gradient clipping
+        entropy_coef=0.01,        # 熵系数 (鼓励探索) / Entropy coefficient (encourages exploration)
+        baseline_type='mean'      # 基线类型 (减少方差) / Baseline type (reduces variance)
     )
     
     print("训练器配置 / Trainer configuration:")
     print(f"  - 学习率 / Learning rate: 0.001")
-    print(f"  - 熵权重 / Entropy weight: 0.01")
-    print(f"  - 基线权重 / Baseline weight: 0.9")
-    print(f"  - 梯度裁剪 / Gradient clipping: 1.0")
+    print(f"  - 熵系数 / Entropy coefficient: 0.01")
+    print(f"  - 基线类型 / Baseline type: mean")
     print()
     
     # ========================================================================
@@ -201,10 +199,9 @@ def test_training():
     print()
     
     # 训练循环 / Training loop
-    history = trainer.train(
+    trainer.train(
         num_iterations=num_iterations,
         batch_size=batch_size,
-        verbose=True,           # 打印训练过程 / Print training progress
         print_every=10          # 每10次迭代打印一次 / Print every 10 iterations
     )
     
@@ -219,21 +216,26 @@ def test_training():
     print("步骤7: 训练历史分析 / Step 7: Training History Analysis")
     print("=" * 80)
     
-    print(f"迭代次数 / Iterations: {len(history['mean_reward'])}")
+    # 获取训练历史 / Get training history
+    history = trainer.train_history
+    
+    print(f"迭代次数 / Iterations: {len(history['rewards'])}")
     print()
     
     # 奖励统计 / Reward statistics
     print("奖励统计 / Reward Statistics:")
-    print(f"  初始平均奖励 / Initial mean reward: {history['mean_reward'][0]:.4f}")
-    print(f"  最终平均奖励 / Final mean reward: {history['mean_reward'][-1]:.4f}")
-    print(f"  最佳奖励 / Best reward: {history['best_reward'][-1]:.4f}")
-    print(f"  奖励提升 / Reward improvement: {history['mean_reward'][-1] - history['mean_reward'][0]:.4f}")
+    if len(history['rewards']) > 0:
+        print(f"  初始平均奖励 / Initial mean reward: {history['rewards'][0]:.4f}")
+        print(f"  最终平均奖励 / Final mean reward: {history['rewards'][-1]:.4f}")
+        print(f"  最佳奖励 / Best reward: {history['best_reward']:.4f}")
+        print(f"  奖励提升 / Reward improvement: {history['rewards'][-1] - history['rewards'][0]:.4f}")
     print()
     
     # 损失统计 / Loss statistics
     print("损失统计 / Loss Statistics:")
-    print(f"  最终策略损失 / Final policy loss: {history['policy_loss'][-1]:.4f}")
-    print(f"  最终熵 / Final entropy: {history['entropy'][-1]:.4f}")
+    if len(history['policy_loss']) > 0:
+        print(f"  最终策略损失 / Final policy loss: {history['policy_loss'][-1]:.4f}")
+        print(f"  最终熵 / Final entropy: {history['entropy'][-1]:.4f}")
     print()
     
     # ========================================================================
@@ -249,18 +251,18 @@ def test_training():
     print("Sampling 100 expressions and selecting best 10...")
     print()
     
-    best_expressions = trainer.sample_best_expressions(
-        n_samples=100,
-        top_k=10
-    )
+    best_expressions = trainer.sample_best_expressions(num_samples=100)
     
-    if len(best_expressions) > 0:
-        print(f"找到 {len(best_expressions)} 个表达式:")
-        print(f"Found {len(best_expressions)} expressions:")
+    # 只显示前10个 / Only show top 10
+    top_10 = best_expressions[:10]
+    
+    if len(top_10) > 0:
+        print(f"找到 {len(best_expressions)} 个表达式，显示前10个:")
+        print(f"Found {len(best_expressions)} expressions, showing top 10:")
         print()
         
-        for i, (expr_str, reward) in enumerate(best_expressions):
-            print(f"  {i+1:2d}. {expr_str:50s} (奖励/reward: {reward:.4f})")
+        for i, (expr, reward) in enumerate(top_10):
+            print(f"  {i+1:2d}. {expr.to_string():50s} (奖励/reward: {reward:.4f})")
         
         # 验证最佳表达式 / Verify best expression
         print()
@@ -268,16 +270,12 @@ def test_training():
         print("最佳表达式详细信息 / Best Expression Details:")
         print("-" * 80)
         
-        best_expr_str, best_reward = best_expressions[0]
-        print(f"表达式 / Expression: {best_expr_str}")
+        best_expr, best_reward = top_10[0]
+        print(f"表达式 / Expression: {best_expr.to_string()}")
         print(f"奖励 / Reward: {best_reward:.4f}")
-        
-        # 重新评估以显示详细信息 / Re-evaluate to show details
-        # 注意: 这里需要从字符串重建表达式，简化起见我们重新采样
-        # Note: Would need to reconstruct from string, for simplicity we resample
         print()
         print("目标函数 / Target: y = x1^2 + x2")
-        print(f"最佳找到 / Best found: {best_expr_str}")
+        print(f"最佳找到 / Best found: {best_expr.to_string()}")
         
     else:
         print("未找到有效表达式 / No valid expressions found")
@@ -321,14 +319,14 @@ def test_training():
     print(f"✓ Successfully trained for {num_iterations} iterations")
     print()
     
-    print(f"✓ 奖励从 {history['mean_reward'][0]:.4f} 提升到 {history['mean_reward'][-1]:.4f}")
-    print(f"✓ Reward improved from {history['mean_reward'][0]:.4f} to {history['mean_reward'][-1]:.4f}")
+    print(f"✓ 奖励从 {history['rewards'][0]:.4f} 提升到 {history['rewards'][-1]:.4f}")
+    print(f"✓ Reward improved from {history['rewards'][0]:.4f} to {history['rewards'][-1]:.4f}")
     print()
     
-    if len(best_expressions) > 0:
-        best_expr_str, best_reward = best_expressions[0]
-        print(f"✓ 最佳表达式: {best_expr_str}")
-        print(f"✓ Best expression: {best_expr_str}")
+    if len(top_10) > 0:
+        best_expr, best_reward = top_10[0]
+        print(f"✓ 最佳表达式: {best_expr.to_string()}")
+        print(f"✓ Best expression: {best_expr.to_string()}")
         print(f"✓ 最佳奖励: {best_reward:.4f}")
         print(f"✓ Best reward: {best_reward:.4f}")
     

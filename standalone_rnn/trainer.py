@@ -136,23 +136,22 @@ class PolicyGradientTrainer:
         # 注意：采样过程不需要梯度
         # Note: Sampling process doesn't need gradients
         with torch.no_grad():
-            actions, observations, probs = self.policy.sample(batch_size, use_prior=True)
+            actions, observations, probs, lengths = self.policy.sample(batch_size, use_prior=True)
         
         # 步骤2: 评估奖励 / Step 2: Evaluate rewards
         rewards = np.zeros(batch_size)
         for i in range(batch_size):
-            # 构建表达式 / Build expression
-            valid_len = np.where(actions[i] == 0)[0]
-            valid_len = valid_len[0] if len(valid_len) > 0 else len(actions[i])
+            # 使用返回的实际长度 / Use returned actual length
+            valid_len = lengths[i]
             
             try:
                 expr = Expression(actions[i, :valid_len].tolist(), self.policy.library)
                 reward = self.reward_function(expr)
                 rewards[i] = reward
             except Exception as e:
-                # 如果表达式无效，给予负奖励
-                # If expression is invalid, give negative reward
-                rewards[i] = -10.0
+                # 如果表达式无效，给予低奖励
+                # If expression is invalid, give low reward
+                rewards[i] = 0.0
         
         # 步骤3: 计算基线 / Step 3: Compute baseline
         if self.baseline_type == 'mean':
@@ -291,12 +290,11 @@ class PolicyGradientTrainer:
         num_batches = (num_samples + batch_size - 1) // batch_size
         
         for _ in range(num_batches):
-            actions, _, _ = self.policy.sample(batch_size, use_prior=True)
+            actions, _, _, lengths = self.policy.sample(batch_size, use_prior=True)
             
             for i in range(batch_size):
-                # 构建表达式 / Build expression
-                valid_len = np.where(actions[i] == 0)[0]
-                valid_len = valid_len[0] if len(valid_len) > 0 else len(actions[i])
+                # 使用返回的实际长度 / Use returned actual length
+                valid_len = lengths[i]
                 
                 try:
                     expr = Expression(actions[i, :valid_len].tolist(), self.policy.library)

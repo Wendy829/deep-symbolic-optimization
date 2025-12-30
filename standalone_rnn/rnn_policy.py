@@ -182,7 +182,7 @@ class RNNPolicy(nn.Module):
         return logits, hidden
     
     def sample(self, batch_size: int, 
-               use_prior: bool = True) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+               use_prior: bool = True) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
         采样一批表达式
         Sample a batch of expressions
@@ -210,6 +210,10 @@ class RNNPolicy(nn.Module):
         probs: np.ndarray, shape (batch_size, max_length, n_tokens)
             每步的概率分布
             Probability distributions at each step
+        
+        lengths: np.ndarray, shape (batch_size,)
+            每个表达式的实际长度（完成点）
+            Actual length of each expression (completion point)
         
         采样过程 / Sampling Process:
         --------------------------
@@ -305,7 +309,29 @@ class RNNPolicy(nn.Module):
                 if np.all(done):
                     break
         
-        return actions, observations, probs
+        # 计算每个表达式的实际长度 / Compute actual length of each expression
+        # 通过检查完成点而不是寻找0（因为token 0是有效的'add'）
+        # By checking completion points instead of looking for 0 (since token 0 is valid 'add')
+        lengths = np.zeros(batch_size, dtype=np.int32)
+        for i in range(batch_size):
+            dangling = 1
+            for j in range(self.max_length):
+                if actions[i, j] < 0:
+                    break
+                token_idx = actions[i, j]
+                arity = self.library.arities[token_idx]
+                dangling += arity - 1
+                if dangling == 0:
+                    lengths[i] = j + 1
+                    break
+                elif dangling < 0:
+                    break
+            # 如果没有找到完成点，使用整个长度
+            # If no completion point found, use entire length
+            if lengths[i] == 0:
+                lengths[i] = self.max_length
+        
+        return actions, observations, probs, lengths
     
     def compute_log_probs(self, 
                          actions: np.ndarray,
@@ -436,14 +462,13 @@ if __name__ == "__main__":
     # Test 1: Sample expressions
     print("\n\n测试1: 采样表达式 / Sample Expressions")
     batch_size = 3
-    actions, obs, probs = policy.sample(batch_size, use_prior=True)
+    actions, obs, probs, lengths = policy.sample(batch_size, use_prior=True)
     
     print(f"采样了 {batch_size} 个表达式 / Sampled {batch_size} expressions:")
     for i in range(batch_size):
         try:
-            # 找到有效长度 / Find valid length
-            valid_len = np.where(actions[i] == 0)[0]
-            valid_len = valid_len[0] if len(valid_len) > 0 else len(actions[i])
+            # 使用返回的实际长度 / Use returned actual length
+            valid_len = lengths[i]
             
             # Filter out invalid token indices and get names
             # 过滤无效的标记索引并获取名称

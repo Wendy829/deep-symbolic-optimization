@@ -309,26 +309,30 @@ class RNNPolicy(nn.Module):
                 if np.all(done):
                     break
         
-        # 计算每个表达式的实际长度 / Compute actual length of each expression
-        # 通过检查完成点而不是寻找0（因为token 0是有效的'add'）
-        # By checking completion points instead of looking for 0 (since token 0 is valid 'add')
+        # 计算每个表达式的实际长度（使用DSO的方法）
+        # Compute actual length of each expression (using DSO's method)
+        # DSO方法：使用cumsum追踪dangling nodes
+        # DSO method: use cumsum to track dangling nodes
         lengths = np.zeros(batch_size, dtype=np.int32)
         for i in range(batch_size):
-            dangling = 1
-            for j in range(self.max_length):
-                if actions[i, j] < 0:
-                    break
-                token_idx = actions[i, j]
-                arity = self.library.arities[token_idx]
-                dangling += arity - 1
-                if dangling == 0:
-                    lengths[i] = j + 1
-                    break
-                elif dangling < 0:
-                    break
-            # 如果没有找到完成点，使用整个长度
-            # If no completion point found, use entire length
-            if lengths[i] == 0:
+            # 获取此序列的arity
+            # Get arities for this sequence
+            arities = np.array([self.library.arities[int(actions[i, j])] for j in range(self.max_length)])
+            
+            # DSO方法: dangling = 1 + cumsum(arities - 1)
+            # 当dangling达到0时，表达式完成
+            # DSO method: dangling = 1 + cumsum(arities - 1)
+            # When dangling reaches 0, expression is complete
+            dangling = 1 + np.cumsum(arities - 1)
+            
+            # 找到第一个dangling为0的位置（表达式完成）
+            # Find first position where dangling is 0 (expression complete)
+            complete_indices = np.where(dangling == 0)[0]
+            if len(complete_indices) > 0:
+                lengths[i] = complete_indices[0] + 1
+            else:
+                # 如果没完成，使用所有非零token的长度
+                # If not complete, use length of all non-zero tokens
                 lengths[i] = self.max_length
         
         return actions, observations, probs, lengths

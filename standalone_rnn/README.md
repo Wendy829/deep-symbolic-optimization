@@ -31,11 +31,18 @@ policy = RNNPolicy(lib, prior, state_mgr, hidden_size=32)
 X = np.random.uniform(-2, 2, size=(100, 2))
 y = X[:, 0]**2 + X[:, 1]
 
-# 3. Define reward function
+# 3. Define reward function (DSO-style positive rewards)
 def reward_fn(expr):
-    y_pred = expr.evaluate(X)
-    mse = np.mean((y - y_pred)**2)
-    return -mse - 0.01 * expr.complexity()
+    try:
+        y_pred = expr.evaluate(X)
+        nmse = np.mean((y - y_pred)**2) / np.var(y)
+        # inv_nrmse: 1/(1+NRMSE), range [0,1], higher is better
+        reward = 1.0 / (1.0 + np.sqrt(nmse))
+        # Add complexity penalty
+        reward -= 0.01 * expr.complexity()
+        return reward
+    except:
+        return 0.0  # Return lowest reward on failure
 
 # 4. Train
 trainer = PolicyGradientTrainer(policy, reward_fn, learning_rate=0.001)
@@ -295,7 +302,16 @@ Learned: y = x + x  # Mathematically equivalent!
 A: Increase complexity penalty:
 
 ```python
-return -mse - 0.1 * complexity  # Larger coefficient
+# inv_nrmse with larger complexity penalty
+def reward_fn(expr):
+    try:
+        y_pred = expr.evaluate(X)
+        nmse = np.mean((y - y_pred)**2) / np.var(y)
+        reward = 1.0 / (1.0 + np.sqrt(nmse))
+        reward -= 0.1 * expr.complexity()  # Larger coefficient
+        return reward
+    except:
+        return 0.0
 ```
 
 **Q: How to save/load model?**

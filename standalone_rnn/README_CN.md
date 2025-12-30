@@ -360,15 +360,20 @@ for iteration in range(num_iterations):
 
 ```python
 def reward_function(expr):
-    # 1. 拟合质量
-    y_pred = expr.evaluate(X)
-    mse = mean((y - y_pred)**2)
-    
-    # 2. 复杂度惩罚
-    complexity_penalty = 0.01 * expr.complexity()
-    
-    # 3. 总奖励
-    return -mse - complexity_penalty
+    try:
+        # 1. 拟合质量（使用归一化误差）
+        y_pred = expr.evaluate(X)
+        nmse = np.mean((y - y_pred)**2) / np.var(y)
+        # 转换为正值奖励
+        accuracy_reward = 1.0 / (1.0 + np.sqrt(nmse))
+        
+        # 2. 复杂度惩罚
+        complexity_penalty = 0.01 * expr.complexity()
+        
+        # 3. 总奖励（范围约[0, 1]）
+        return accuracy_reward - complexity_penalty
+    except:
+        return 0.0
 ```
 
 **训练技巧:**
@@ -392,11 +397,18 @@ prior = HierarchicalPrior(lib)
 state_mgr = StateManager(lib)
 policy = RNNPolicy(lib, prior, state_mgr)
 
-# 步骤3: 定义奖励
+# 步骤3: 定义奖励（类似DSO的正值奖励）
 def reward_fn(expr):
-    y_pred = expr.evaluate(X)
-    mse = np.mean((y - y_pred)**2)
-    return -mse - 0.01 * expr.complexity()
+    try:
+        y_pred = expr.evaluate(X)
+        nmse = np.mean((y - y_pred)**2) / np.var(y)
+        # inv_nrmse: 1/(1+NRMSE)，范围[0,1]，越高越好
+        reward = 1.0 / (1.0 + np.sqrt(nmse))
+        # 添加复杂度惩罚
+        reward -= 0.01 * expr.complexity()
+        return reward
+    except:
+        return 0.0  # 失败时返回最低奖励
 
 # 步骤4: 创建训练器
 trainer = PolicyGradientTrainer(
@@ -418,24 +430,25 @@ print(f"最佳表达式: {best_exprs[0][0]}")
 
 ```
 迭代 10/100
-  平均奖励: -12.5432
-  最大奖励: -8.2341
-  最佳奖励: -8.2341
-  策略损失: 2.3451
+  平均奖励: 0.3542
+  最大奖励: 0.6341
+  最佳奖励: 0.6341
+  策略损失: 0.3451
   熵: 1.8765
 
 迭代 20/100
-  平均奖励: -9.8765
-  最大奖励: -5.6789
-  最佳奖励: -5.6789
-  策略损失: 1.9876
+  平均奖励: 0.5876
+  最大奖励: 0.8789
+  最佳奖励: 0.8789
+  策略损失: 0.1976
   熵: 1.6543
 
 ...
 
 训练完成!
 最佳表达式: add(square(x1), x2)
-MSE: 0.0234
+NRMSE: 0.0234
+奖励: 0.9876
 ```
 
 ---
@@ -460,10 +473,16 @@ prior = HierarchicalPrior(lib, max_length=10)
 state_mgr = StateManager(lib, max_length=10)
 policy = RNNPolicy(lib, prior, state_mgr, hidden_size=32)
 
-# 定义奖励
+# 定义奖励（正值奖励，类似DSO）
 def reward_fn(expr):
-    y_pred = expr.evaluate(X)
-    return -np.mean((y - y_pred)**2) - 0.01 * expr.complexity()
+    try:
+        y_pred = expr.evaluate(X)
+        nmse = np.mean((y - y_pred)**2) / np.var(y)
+        reward = 1.0 / (1.0 + np.sqrt(nmse))
+        reward -= 0.01 * expr.complexity()
+        return reward
+    except:
+        return 0.0
 
 # 训练
 trainer = PolicyGradientTrainer(policy, reward_fn)
@@ -537,9 +556,14 @@ lib = create_default_library(n_input_vars=2)
 
 ```python
 def reward_fn(expr):
-    mse = ...
-    complexity = expr.complexity()
-    return -mse - 0.1 * complexity  # 增大系数
+    try:
+        y_pred = expr.evaluate(X)
+        nmse = np.mean((y - y_pred)**2) / np.var(y)
+        reward = 1.0 / (1.0 + np.sqrt(nmse))
+        reward -= 0.1 * expr.complexity()  # 增大系数
+        return reward
+    except:
+        return 0.0
 ```
 
 ### Q4: 如何添加新的运算符？

@@ -323,11 +323,17 @@ print(expr)  # add(x1, mul(x2, x2))
 X = np.random.uniform(-2, 2, (100, 2))
 y = X[:, 0]**2 + X[:, 1]
 
-# 定义奖励
+# 定义奖励（类似DSO的正值奖励）
 def reward_fn(expr):
-    y_pred = expr.evaluate(X)
-    mse = np.mean((y - y_pred)**2)
-    return -mse - 0.01 * expr.complexity()
+    try:
+        y_pred = expr.evaluate(X)
+        nmse = np.mean((y - y_pred)**2) / np.var(y)
+        # inv_nrmse: 1/(1+NRMSE)，范围[0,1]
+        reward = 1.0 / (1.0 + np.sqrt(nmse))
+        reward -= 0.01 * expr.complexity()
+        return reward
+    except:
+        return 0.0
 
 # 训练
 trainer = PolicyGradientTrainer(policy, reward_fn)

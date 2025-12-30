@@ -342,8 +342,16 @@ if __name__ == "__main__":
     # 目标: 鼓励简短的表达式
     # Goal: Encourage short expressions
     def reward_fn(expr: Expression) -> float:
-        """简单奖励: 负的复杂度 / Simple reward: negative complexity"""
-        return -expr.complexity()
+        """
+        简单奖励: 基于复杂度的正值奖励（类似DSO）
+        Simple reward: positive reward based on complexity (like DSO)
+        
+        范围 [0, 1]，越高越好
+        Range [0, 1], higher is better
+        """
+        # 将复杂度转换为正值奖励: 1 / (1 + complexity)
+        # Convert complexity to positive reward: 1 / (1 + complexity)
+        return 1.0 / (1.0 + expr.complexity())
     
     # 创建训练器 / Create trainer
     trainer = PolicyGradientTrainer(

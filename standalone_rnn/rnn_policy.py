@@ -417,31 +417,40 @@ if __name__ == "__main__":
     
     print(f"采样了 {batch_size} 个表达式 / Sampled {batch_size} expressions:")
     for i in range(batch_size):
-        # 找到有效长度 / Find valid length
-        valid_len = np.where(actions[i] == 0)[0]
-        valid_len = valid_len[0] if len(valid_len) > 0 else len(actions[i])
-        
-        # Filter out invalid token indices and get names
-        # 过滤无效的标记索引并获取名称
-        token_names = []
-        for a in actions[i, :valid_len]:
-            a_int = int(a)
-            if 0 <= a_int < lib.n_tokens:
-                token_names.append(lib.get_token(a_int).name)
-        print(f"  {i+1}. {token_names}")
+        try:
+            # 找到有效长度 / Find valid length
+            valid_len = np.where(actions[i] == 0)[0]
+            valid_len = valid_len[0] if len(valid_len) > 0 else len(actions[i])
+            
+            # Filter out invalid token indices and get names
+            # 过滤无效的标记索引并获取名称
+            token_names = []
+            for a in actions[i, :valid_len]:
+                a_int = int(a)
+                if 0 <= a_int < lib.n_tokens:
+                    token_names.append(lib.get_token(a_int).name)
+            print(f"  {i+1}. {token_names}")
+        except Exception as e:
+            print(f"  {i+1}. Error processing expression: {e}")
     
     # 测试2: 计算对数概率
     # Test 2: Compute log probabilities
     print("\n\n测试2: 计算对数概率 / Compute Log Probabilities")
-    log_probs = policy.compute_log_probs(actions, obs)
-    print(f"对数概率形状 / Log probs shape: {log_probs.shape}")
-    print(f"平均对数概率 / Mean log prob: {log_probs.mean():.4f}")
+    try:
+        log_probs = policy.compute_log_probs(actions, obs)
+        print(f"对数概率形状 / Log probs shape: {log_probs.shape}")
+        print(f"平均对数概率 / Mean log prob: {log_probs.mean():.4f}")
+    except Exception as e:
+        print(f"Error computing log probabilities: {e}")
     
     # 测试3: 计算熵
     # Test 3: Compute entropy
     print("\n\n测试3: 计算熵 / Compute Entropy")
-    entropy = policy.compute_entropy(obs)
-    print(f"熵形状 / Entropy shape: {entropy.shape}")
-    print(f"平均熵 / Mean entropy: {entropy.mean():.4f}")
-    print(f"(高熵 = 更多探索，低熵 = 更确定的策略)")
-    print(f"(High entropy = more exploration, low entropy = more certain policy)")
+    try:
+        entropy = policy.compute_entropy(obs)
+        print(f"熵形状 / Entropy shape: {entropy.shape}")
+        print(f"平均熵 / Mean entropy: {entropy.mean():.4f}")
+        print(f"(高熵 = 更多探索，低熵 = 更确定的策略)")
+        print(f"(High entropy = more exploration, low entropy = more certain policy)")
+    except Exception as e:
+        print(f"Error computing entropy: {e}")
